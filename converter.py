@@ -1,58 +1,36 @@
-from flask import Flask, request, send_file
 import os
 import subprocess
 
-app = Flask(__name__)
+# Input video path
+vid = input("Input your video here: ")
+if vid.startswith("'"):
+    vid = vid[1:-1]  # Strip the surrounding quotes if any.
 
-UPLOAD_FOLDER = 'uploads'
-OUTPUT_FOLDER = 'output'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['OUTPUT_FOLDER'] = OUTPUT_FOLDER
+# Check if the video file exists
+if not os.path.exists(vid):
+    print("The provided video file doesn't exist!")
+    exit()
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+# Set path for the second script (the one you want to run)
+second_script_path = "path_to_second_script.py"  # Change to the location of your second script
 
-@app.route('/')
-def index():
-    return '''
-        <form action="/upload" method="post" enctype="multipart/form-data">
-            <input type="file" name="file">
-            <input type="submit">
-        </form>
-    '''
-
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return 'No file part'
-    file = request.files['file']
-    if file.filename == '':
-        return 'No selected file'
+# Run the second script with the video file as an argument
+try:
+    result = subprocess.run(
+        ["python", second_script_path, vid],
+        capture_output=True, text=True
+    )
     
-
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-    file.save(filepath)
-
-    output_filename = f"{os.path.splitext(file.filename)[0]}.sb3"
-    output_filepath = os.path.join(app.config['OUTPUT_FOLDER'], output_filename)
-
-    try:
-
-
-        subprocess.run(["python", "video2sb3.py", filepath, output_filepath], check=True)
-
-        # Provide the file for download
-        return send_file(output_filepath, as_attachment=True, download_name=output_filename)
+    # Print the output of the second script
+    print("Second script output:", result.stdout)
     
-    except subprocess.CalledProcessError as e:
-        return f"Error during conversion: {e}"
+    # If there is an error, print the error message
+    if result.stderr:
+        print("Second script error:", result.stderr)
+        
+    # Check the return code of the subprocess
+    if result.returncode != 0:
+        print(f"Error: The second script returned a non-zero exit status: {result.returncode}")
     
-    finally:
-
-        if os.path.exists(filepath):
-            os.remove(filepath)
-        if os.path.exists(output_filepath):
-            os.remove(output_filepath)
-
-if __name__ == '__main__':
-    app.run(debug=True)
+except Exception as e:
+    print(f"Error running second script: {e}")
